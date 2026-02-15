@@ -30,6 +30,7 @@ const Handlers: { [K in keyof CoordinatorActionMap]: Handler<K> } = {
     return true;
   },
 
+  // --------------- VIDEO MANAGER --------------- //
   PLAY_VIDEO: (msg) => {
     const { payload } = msg;
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
@@ -59,6 +60,7 @@ const Handlers: { [K in keyof CoordinatorActionMap]: Handler<K> } = {
     sidePanelOpen = msg.payload.open;
   },
 
+  // -------------- PLAYLISTS MANAGER ----------------- //
   GET_ALL_PLAYLIST: (_, __, sendResponse) => {
     chrome.storage.local.get('playlists').then((playlists) => {
       console.info(`[BG ACTIONS] getting all playlists: `, playlists);
@@ -85,6 +87,34 @@ const Handlers: { [K in keyof CoordinatorActionMap]: Handler<K> } = {
       console.info('[BG ACTIONS] Update playlists:', await chrome.storage.local.get(null));
     })();
 
+    return true;
+  },
+
+  REMOVE_PLAYLIST: (msg, _, sendResponse) => {
+    (async () => {
+      const { key } = msg.payload;
+      try {
+        const result = await chrome.storage.local.get('playlists');
+        const playlists = (result.playlists ?? {}) as StoragePlaylist;
+        if (!playlists) {
+          return; // IMPROVE: Design a consisten error handling for each action type.
+        }
+
+        delete playlists[key];
+        await chrome.storage.local.set({ playlists });
+
+        sendResponse({ status: 'ok' });
+      } catch (error) {
+        if (chrome.runtime.lastError) {
+          console.info(
+            `error removing playlist ${key} with reference:\n${chrome.runtime.lastError}`,
+            error,
+          );
+          sendResponse({ status: String(error) });
+        }
+        console.error(error);
+      }
+    })();
     return true;
   },
 };

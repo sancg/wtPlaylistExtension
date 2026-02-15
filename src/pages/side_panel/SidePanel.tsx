@@ -81,6 +81,29 @@ function SidePanel() {
       .finally(() => setIsLoading(false));
   }, []);
 
+  useEffect(() => {
+    const listener: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (
+      changes,
+      areaName,
+    ) => {
+      if (areaName !== 'local') return;
+
+      if (changes.playlists?.newValue) {
+        setMultiPlaylist(changes.playlists.newValue as StoragePlaylist);
+      }
+
+      if (changes.playlists?.newValue === undefined) {
+        setMultiPlaylist({});
+      }
+    };
+
+    chrome.storage.onChanged.addListener(listener);
+
+    return () => {
+      chrome.storage.onChanged.removeListener(listener);
+    };
+  }, []);
+
   const handleActiveVideo = (video: Video) => {
     console.info(`[SIDE_PANEL] Selecting video: `, video);
     setCurrentVideo(video);
@@ -89,6 +112,7 @@ function SidePanel() {
       payload: { videoId: video.id, index: video.currentIndex as number },
     });
   };
+
   const renderView = () => {
     return (
       <div
@@ -109,7 +133,7 @@ function SidePanel() {
                   playList={[values[0]]}
                   imgVariant='stacked'
                   viewState={panelView}
-                  title={plName}
+                  playlistKey={plName}
                   chip={values.length}
                   onItemClick={() => handleForwardView(plName)}
                 />
@@ -137,6 +161,7 @@ function SidePanel() {
       </div>
     );
   };
+
   return (
     <main className='bg-yt-bg w-full h-lvh p-1 text-yt-text-primary'>
       <div className='relative flex flex-col min-w-3xs h-full bg-yt-bg shadow-lg border rounded-2xl border-yt-br_new  overflow-y-hidden'>

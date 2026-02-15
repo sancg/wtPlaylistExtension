@@ -40,6 +40,12 @@ type CoordinatorActionMap = {
       status: 'ok';
     };
   };
+
+  REMOVE_PLAYLIST: {
+    type: 'REMOVE_PLAYLIST';
+    payload: { key: string };
+    response?: { status: 'ok' };
+  };
 };
 
 type CoordinatorMessage = CoordinatorActionMap[keyof CoordinatorActionMap];

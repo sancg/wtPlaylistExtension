@@ -34,35 +34,37 @@ let tabUrl: string = '';
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (!tab.url || !info.url) return;
   tabUrl = tab.url;
+
+  handleAvailableSP(tabId, tabUrl, 'onUpdated');
   if (cs.ALLOWED_EXTENSION(tabUrl)) {
-    console.log('[BG] Sending message of tab onUpdated', { info, tab });
     try {
+      console.log('[BG] Sending message of tab onUpdated', { info, tab });
       await chrome.tabs.sendMessage(tabId, { action: 'url_change', payload: { tab } });
     } catch (error) {
       console.info('onUpdated: cs is not available', error);
     }
   }
-  handleAvailableSP(tabId, tabUrl, 'onUpdated');
 });
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const tab = await chrome.tabs.get(tabId);
   if (!tab.url) return;
 
-  if (cs.ALLOWED_EXTENSION(tab.url)) {
-    console.log('[BG] Sending message of tab onActivated', { tab });
-    try {
-      setTimeout(async () => {
-        await chrome.tabs.sendMessage(tabId, { action: 'url_change', payload: { tab } });
-      }, 300);
-    } catch (error) {
-      // FIXME: This error occurs when [CS] is not available at the time of execution
-      // 1. Implement a debounce when sendMessage()
-      // 2. Ensure injection via chrome.scripting.executeScript() or similar
-      console.info('onActivated: cs is not available - ', error);
-    }
-  }
   handleAvailableSP(tabId, tab.url, 'onActivated');
+  if (cs.ALLOWED_EXTENSION(tab.url)) {
+    setTimeout(async () => {
+      console.log('[BG] Sending message of tab onActivated', { tab });
+      try {
+        await chrome.tabs.sendMessage(tabId, { action: 'url_change', payload: { tab } });
+      } catch (error) {
+        // FIXME: This error occurs when [CS] is not available at the time of execution
+        // 1. Implement a debounce when sendMessage()
+        // 2. Ensure injection via chrome.scripting.executeScript() or similar
+        console.info('onActivated: cs is not available - ', error);
+      }
+      return true;
+    }, 500);
+  }
 });
 
 // ----------------------------------

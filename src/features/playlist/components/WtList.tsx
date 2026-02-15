@@ -9,13 +9,14 @@ import type { ThumbnailVariant } from '../../../components/Thumbnail';
 import type { ViewState } from '../types';
 
 import { Snack, SnackSkeleton } from '.';
+import { sendToBackground } from '../../../utils/actions';
 
 type props = {
   playList: Video[];
   viewState: Pick<ViewState, 'view'>;
   imgVariant: ThumbnailVariant;
   chip?: number | string;
-  title?: string;
+  playlistKey?: string;
   isLoading?: boolean;
   activeVideoId?: string;
   onItemClick?: (video: Video) => void;
@@ -26,7 +27,7 @@ export default function WtList({
   isLoading,
   imgVariant,
   chip,
-  title,
+  playlistKey,
   viewState,
   activeVideoId,
   onItemClick,
@@ -35,6 +36,11 @@ export default function WtList({
   const { containerRef: buttonRef, createBorderRipple } = useRipple();
 
   const observe = useVisibleObserver(refContent.current, (_el) => {});
+
+  const handleOptionClick = async (playlistName: string) => {
+    console.log('[SP] remove playlist action');
+    await sendToBackground({ type: 'REMOVE_PLAYLIST', payload: { key: playlistName } });
+  };
 
   const renderIndex = (active: boolean) => {
     if (!active) {
@@ -86,7 +92,7 @@ export default function WtList({
                 playingVideo={isPlayingVideo}
                 imgVariant={imgVariant}
                 chip={chip || video?.timeLength}
-                title={title}
+                title={playlistKey}
                 viewState={viewState}
               />
               <div className='w-10 mx-1 flex items-center justify-center opacity-0 translate-x-1 scale-90 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 transition-all duration-100 ease-out'>
@@ -97,6 +103,9 @@ export default function WtList({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    if (viewState.view === 'PLAYLISTS') {
+                      handleOptionClick(playlistKey!);
+                    }
                   }}
                   onPointerUp={(e) => {
                     createBorderRipple(e);
