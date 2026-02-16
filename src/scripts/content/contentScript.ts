@@ -1,4 +1,5 @@
 import buildContentPlaylist from './yt_api/buildPlayList';
+import wtPlaybackObserver from './yt_api/observerPlayback';
 console.log('[ContentScript] Loaded...');
 
 let currentVideoId: string | null = null;
@@ -39,9 +40,16 @@ chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
   console.log(`[CS] action registered: `, req);
   switch (req.action) {
     case 'url_change':
+      console.log('[CS] re-injecting button state from ', req.payload.listener);
       const url = req.payload.tab.url; // Info received from BG
+
       void handleNavigation(url);
-      break;
+      return;
+
+    case 'playback_tracker':
+      console.log('[CS] tracking video from selected playlist', req);
+      void wtPlaybackObserver(300, req.payload.playVideo?.index);
+      return;
 
     case 'add_video':
       injectAddVideo();
@@ -60,9 +68,13 @@ chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
 
       return true;
     case 'play_video':
-      chrome.runtime.sendMessage({ type: 'SIDE_PANEL_OPEN', payload: { open: true } });
+      const { videoId, index } = req.payload;
+      chrome.runtime.sendMessage({
+        type: 'VIDEO_PLAYBACK',
+        payload: { playVideo: { videoId, index } },
+      });
       const a = document.createElement('a');
-      a.href = `/watch?v=${req.payload.videoId}`;
+      a.href = `/watch?v=${videoId}`;
       a.click();
       a.remove();
 

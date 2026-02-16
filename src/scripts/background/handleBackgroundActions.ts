@@ -1,11 +1,11 @@
-import { CoordinatorActionMap, SidePanelSession } from '../../types/messages';
-import { StoragePlaylist } from '../../types/video';
+import type { StoragePlaylist } from '../../types/video';
+import type { CoordinatorActionMap, PlayVideo, SidePanelSession } from '../../types/messages';
 
 const DEFAULT_SESSION: SidePanelSession = {
   view: 'PLAYLISTS',
 };
 
-let sidePanelOpen = false;
+export let playingVideo: PlayVideo | null = null;
 
 type Handler<K extends keyof CoordinatorActionMap> = (
   msg: CoordinatorActionMap[K],
@@ -40,24 +40,26 @@ const Handlers: { [K in keyof CoordinatorActionMap]: Handler<K> } = {
   },
 
   VIDEO_CHANGED: (msg) => {
-    if (sidePanelOpen) {
+    if (msg.payload.videoId) {
       chrome.runtime.sendMessage(msg);
     }
   },
 
   VIDEO_PL_ENDED: (msg) => {
+    if (!playingVideo) return;
+
     console.log(`[BG ACTIONS] signal event: VIDEO_ENDED`, msg);
     // IMPROVE: Workflow at this point should include index
     (async () => {
       const activePl = await chrome.storage.local.get('');
-      console.log(activePl);
+      console.log({ activePl, playingVideo });
     })();
   },
 
-  SIDE_PANEL_OPEN: (msg) => {
-    console.info(`[BG ACTIONS] signal that side_panel is open`);
+  VIDEO_PLAYBACK: (msg) => {
+    console.info(`[BG ACTIONS] signal that video has been tracked`);
     chrome.storage.sync;
-    sidePanelOpen = msg.payload.open;
+    playingVideo = msg.payload.playVideo;
   },
 
   // -------------- PLAYLISTS MANAGER ----------------- //

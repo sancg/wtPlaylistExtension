@@ -1,19 +1,21 @@
-const wtPlaybackObserver = (indexVideo?: number) => {
+const wtPlaybackObserver = (timer: number, indexVideo?: number) => {
   let videoEl: HTMLVideoElement | null = null;
   let currentVideoId: string | null = null;
   let signal = false;
 
   function attachPlaybackObserver() {
-    cleanup();
+    cleanUpEvents();
 
-    videoEl = document.querySelector('video.html5-main-video');
-    currentVideoId = getCurrentVideoId();
-    signal = false;
+    setTimeout(() => {
+      videoEl = document.querySelector('video.html5-main-video');
+      currentVideoId = getCurrentVideoId();
+      signal = false;
 
-    console.log({ videoEl, currentVideoId, signal });
-    if (!videoEl) return;
-    videoEl.addEventListener('timeupdate', onTimeUpdate);
-    videoEl.addEventListener('ended', onEnded);
+      console.log({ videoEl, currentVideoId, signal });
+      if (!videoEl) return;
+      videoEl.addEventListener('timeupdate', onTimeUpdate);
+      videoEl.addEventListener('ended', onEnded);
+    }, timer);
   }
 
   function onTimeUpdate() {
@@ -42,10 +44,12 @@ const wtPlaybackObserver = (indexVideo?: number) => {
       type: 'VIDEO_PL_ENDED',
       payload: { videoId: currentVideoId, timestamp: Date.now(), indexVideo },
     });
+
+    cleanUpEvents();
   }
 
-  function cleanup() {
-    console.info(`[CS] video observer cleanup`);
+  function cleanUpEvents() {
+    console.info(`[CS] video observer cleanUpEvents`);
     if (!videoEl) return;
 
     videoEl.removeEventListener('timeupdate', onTimeUpdate);

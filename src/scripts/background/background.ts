@@ -1,7 +1,7 @@
 import { cs } from '../shared/constants';
 import { handleAvailableSP } from './handleAvailableSP';
 import { checkCommandShortcuts } from './commands';
-import Handlers from './handleBackgroundActions';
+import Handlers, { playingVideo } from './handleBackgroundActions';
 import type { Video } from '../../types/video';
 import { CoordinatorMessage } from '../../types/messages';
 
@@ -34,12 +34,25 @@ let tabUrl: string = '';
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (!tab.url || !info.url) return;
   tabUrl = tab.url;
-
-  handleAvailableSP(tabId, tabUrl, 'onUpdated');
+  const listener = 'onUpdated';
+  handleAvailableSP(tabId, tabUrl, listener);
   if (cs.ALLOWED_EXTENSION(tabUrl)) {
     try {
       console.log('[BG] Sending message of tab onUpdated', { info, tab });
-      await chrome.tabs.sendMessage(tabId, { action: 'url_change', payload: { tab } });
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'url_change',
+        payload: { tab, listener },
+      });
+
+      if (playingVideo) {
+        console.log('[BG] sending tracker to playlist video ', playingVideo);
+        await chrome.tabs.sendMessage(tabId, {
+          action: 'playback_tracker',
+          payload: {
+            playVideo: playingVideo,
+          },
+        });
+      }
     } catch (error) {
       console.info('onUpdated: cs is not available', error);
     }
@@ -49,13 +62,17 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const tab = await chrome.tabs.get(tabId);
   if (!tab.url) return;
+  const listener = 'onActivated';
 
-  handleAvailableSP(tabId, tab.url, 'onActivated');
+  handleAvailableSP(tabId, tab.url, listener);
   if (cs.ALLOWED_EXTENSION(tab.url)) {
     setTimeout(async () => {
       console.log('[BG] Sending message of tab onActivated', { tab });
       try {
-        await chrome.tabs.sendMessage(tabId, { action: 'url_change', payload: { tab } });
+        await chrome.tabs.sendMessage(tabId, {
+          action: 'url_change',
+          payload: { tab, listener },
+        });
       } catch (error) {
         // FIXME: This error occurs when [CS] is not available at the time of execution
         // 1. Implement a debounce when sendMessage()
