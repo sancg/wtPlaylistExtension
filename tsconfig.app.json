@@ -10,6 +10,7 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "forceConsistentCasingInFileNames": true,
+    "types": ["vite/client", "chrome"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
