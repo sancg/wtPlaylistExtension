@@ -1,7 +1,7 @@
 type props = { items: number };
-export const WtListSkeletonItem = ({ items }: props) => {
+export default function SnackSkeleton({ items }: props) {
   return (
-    <div>
+    <>
       {Array.from({ length: items }).map((_, i) => (
         <div className='flex items-center p-2 gap-3 animate-pulse' key={i}>
           {/* thumbnail */}
@@ -17,6 +17,6 @@ export const WtListSkeletonItem = ({ items }: props) => {
           <div className='w-6 h-6 rounded bg-yt-bg-tertiary' />
         </div>
       ))}
-    </div>
+    </>
   );
-};
+}

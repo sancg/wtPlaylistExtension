@@ -1,8 +1,8 @@
 import { cs } from '../shared/constants';
 import { handleAvailableSP } from './handleAvailableSP';
 import { checkCommandShortcuts } from './commands';
-import Handlers from './handleBackgroundActions';
-import type { Video } from '../../types/video';
+import Handlers, { playingVideo } from './handleBackgroundActions';
+import type { StoragePlaylist, Video } from '../../types/video';
 import { CoordinatorMessage } from '../../types/messages';
 
 console.log('[Background] Ready...');
@@ -34,33 +34,54 @@ let tabUrl: string = '';
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (!tab.url || !info.url) return;
   tabUrl = tab.url;
+  const listener = 'onUpdated';
+  handleAvailableSP(tabId, tabUrl, listener);
   if (cs.ALLOWED_EXTENSION(tabUrl)) {
-    console.log('[BG] Sending message of tab onUpdated', { info, tab });
     try {
-      await chrome.tabs.sendMessage(tabId, { action: 'url_change', payload: { tab } });
+      console.log('[BG] Sending message of tab onUpdated', { info, tab });
+      await chrome.tabs.sendMessage(tabId, {
+        action: 'url_change',
+        payload: { tab, listener },
+      });
+
+      if (playingVideo) {
+        console.log('[BG] sending tracker to playlist video ', playingVideo);
+        await chrome.tabs.sendMessage(tabId, {
+          action: 'playback_tracker',
+          payload: {
+            playVideo: playingVideo,
+          },
+        });
+      }
     } catch (error) {
       console.info('onUpdated: cs is not available', error);
     }
   }
-  handleAvailableSP(tabId, tabUrl, 'onUpdated');
 });
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const tab = await chrome.tabs.get(tabId);
   if (!tab.url) return;
+  const listener = 'onActivated';
 
+  handleAvailableSP(tabId, tab.url, listener);
   if (cs.ALLOWED_EXTENSION(tab.url)) {
-    console.log('[BG] Sending message of tab onActivated', { tab });
-    try {
-      await chrome.tabs.sendMessage(tabId, { action: 'url_change', payload: { tab } });
-    } catch (error) {
-      // FIXME: This error occurs when [CS] is not available at the time of execution
-      // 1. Implement a debounce when sendMessage()
-      // 2. Ensure injection via chrome.scripting.executeScript() or similar
-      console.info('onActivated: cs is not available - ', error);
-    }
+    setTimeout(async () => {
+      console.log('[BG] Sending message of tab onActivated', { tab });
+      try {
+        await chrome.tabs.sendMessage(tabId, {
+          action: 'url_change',
+          payload: { tab, listener },
+        });
+      } catch (error) {
+        // FIXME: This error occurs when [CS] is not available at the time of execution
+        // 1. Implement a debounce when sendMessage()
+        // 2. Ensure injection via chrome.scripting.executeScript() or similar
+        console.info('onActivated: cs is not available - ', error);
+      }
+      return true;
+    }, 500);
   }
-  handleAvailableSP(tabId, tab.url, 'onActivated');
 });
 
 // ----------------------------------
@@ -85,64 +106,75 @@ chrome.runtime.onMessage.addListener((res, _sender, sendResponse) => {
 
   if (res.type === cs.IS_SAVED) {
     const cID = res.payload.currentId;
-    chrome.storage.local.get('download-ready').then((sg) => {
-      const list: Video[] = (sg['download-ready'] as []) || [];
+    chrome.storage.local.get('playlists').then((gen) => {
+      const pl: StoragePlaylist = (gen.playlists || {}) as StoragePlaylist;
+      const list: Video[] = (pl['heart'] as []) || [];
       const exists = list.some((v) => {
         if (!v.id) {
           return false;
         }
         return v.id === cID;
       });
-
       sendResponse({ exists });
     });
     return true;
   }
 
   if (res.type === cs.ADD_VIDEO) {
-    chrome.storage.local.get('download-ready').then((st) => {
-      const video = res.payload.video;
+    chrome.storage.local.get('playlists').then((r) => {
+      let heart: Video[] = [];
+      const video: Video = res.payload.video;
       if (!video) {
         console.log('[BG] No id provided on payload');
         sendResponse({ error: 'no video provided on payload' });
       }
 
-      const list: Video[] = (st['download-ready'] as []) || [];
-      const exists = list.some((v) => {
-        if (!v.id) {
-          return false;
-        }
-        return v.id === video.id;
-      });
-      console.log('ADD VIDEO: ', { list, exists });
+      const generalPlaylist = (r.playlists || {}) as StoragePlaylist;
 
-      if (!exists) list.push(video);
-      chrome.storage.local.set({ 'download-ready': list });
+      // Bring back all of the heart content + the added video
+      if (!generalPlaylist.heart) {
+        heart.push(video);
+        chrome.storage.local.set({ playlists: { ...generalPlaylist, heart: heart } });
+      } else {
+        const exists = generalPlaylist.heart?.some((v: Video) => {
+          if (!v.id) {
+            return false;
+          }
+          return v.id === video.id;
+        });
+
+        if (!exists) generalPlaylist.heart.push(video);
+        chrome.storage.local.set({
+          playlists: { ...generalPlaylist, heart: generalPlaylist.heart },
+        });
+      }
 
       sendResponse({ exists: true });
     });
+
     return true;
   }
 
   if (res.type === cs.REMOVE_VIDEO) {
-    chrome.storage.local.get('download-ready').then((st) => {
+    chrome.storage.local.get('playlists').then((gen) => {
+      const st = (gen.playlists || {}) as StoragePlaylist;
       const id = res.payload.id;
       if (!id) {
         console.warn(`[BG] No id provided on payload`);
         sendResponse({ error: 'No id provided on payload' });
       }
 
-      const list: Video[] = (st['download-ready'] as []) || [];
-      const updateList = list.filter((v) => v.id !== id);
-      console.log(`Updated List: `, { list, updateList });
+      const list: Video[] = (st['heart'] as []) || [];
+      let filterList = list.filter((v) => v.id !== id);
+      let updateHeart = filterList.length > 0 ? filterList : undefined;
 
-      chrome.storage.local.set({ 'download-ready': updateList }, () => {
+      chrome.storage.local.set({ playlists: { ...st, heart: updateHeart } }, () => {
         if (chrome.runtime.lastError) {
           console.error(`[BG] Storage couldn't be updated`, chrome.runtime.lastError);
           sendResponse({ error: "[BG] Storage couldn't be updated" });
         }
       });
-      sendResponse({ exists: false, payload: updateList });
+      sendResponse({ exists: false, payload: filterList });
     });
     return true;
   }
@@ -154,17 +186,17 @@ chrome.runtime.onMessage.addListener((res, _sender, sendResponse) => {
     return true;
   }
 
-  if (res.type === cs.REMOVE_VIDEO) {
-    chrome.storage.local.get('download-ready').then((res) => {
-      const list: Video[] = (res['download-ready'] as []) || [];
-      const next = list.filter((v) => v.id !== res.videoId);
+  // if (res.type === cs.REMOVE_VIDEO) {
+  //   chrome.storage.local.get('download-ready').then((res) => {
+  //     const list: Video[] = (res['download-ready'] as []) || [];
+  //     const next = list.filter((v) => v.id !== res.videoId);
 
-      chrome.storage.local.set({ 'download-ready': next }).then(() => {
-        sendResponse({ status: 'removed' });
-      });
-    });
-    return true;
-  }
+  //     chrome.storage.local.set({ 'download-ready': next }).then(() => {
+  //       sendResponse({ status: 'removed' });
+  //     });
+  //   });
+  //   return true;
+  // }
 
   if (res.type === 'play_video') {
     // TODO: Send message to CS to replace location.href

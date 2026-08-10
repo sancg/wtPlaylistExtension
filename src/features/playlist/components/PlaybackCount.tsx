@@ -1,21 +1,26 @@
 import { ArrowLeftStartOnRectangleIcon } from '@heroicons/react/24/outline';
+
 type props = {
   playlistId?: string;
   activeVideoIndex?: number | boolean;
   totalItems: number;
   actionClick: () => void;
 };
-export const PlaybackCount = ({
+export default function PlaybackCount({
   playlistId,
   totalItems,
   activeVideoIndex,
   actionClick,
-}: props) => {
+}: props) {
   return (
     <>
       <button
-        className='text-sm font-medium p-2 rounded-full hover:cursor-pointer hover:bg-yt-text-muted '
-        onClick={actionClick}
+        className='relative overflow-hidden text-sm h-full font-medium p-2 rounded-full hover:cursor-pointer hover:bg-white/20'
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          actionClick();
+        }}
       >
         <ArrowLeftStartOnRectangleIcon className='w-6' />
       </button>
@@ -35,4 +40,4 @@ export const PlaybackCount = ({
       </div>
     </>
   );
-};
+}

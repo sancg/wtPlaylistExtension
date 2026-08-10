@@ -22,31 +22,6 @@ export function Thumbnail({
   imageClassName = '',
   activeVideoId,
 }: ThumbnailProps) {
-  // const ref = useRef<HTMLDivElement>(null);
-  // const [visible, setVisible] = useState(false);
-
-  // useEffect(() => {
-  //   if (!ref.current) {
-  //     return;
-  //   }
-
-  //   const observer = new IntersectionObserver(
-  //     ([entry]) => {
-  //       console.log({ entry });
-  //       if (entry.isIntersecting) {
-  //         setVisible(true);
-  //         observer.unobserve(entry.target);
-  //       }
-  //     },
-  //     { rootMargin: '300px' },
-  //   );
-
-  //   observer.observe(ref.current);
-
-  //   return () => {
-  //     observer.disconnect();
-  //   };
-  // }, []);
   return (
     <div className={`relative aspect-video overflow-visible ${className}`}>
       {/* {visible && ( */}
@@ -62,7 +37,7 @@ export function Thumbnail({
           loading='lazy'
           src={src}
           alt={alt}
-          className={`relative z-10 h-full w-full rounded-md object-cover ${imageClassName} ${activeVideoId && 'border-2 border-yt-text-primary'}`}
+          className={`relative z-10 h-full w-full rounded-md object-cover ${imageClassName} ${activeVideoId && 'ring-2 ring-yt-text-muted'}`}
         />
 
         {count && <CountChip count={count} />}

@@ -1,6 +1,10 @@
 module.exports = {
   theme: {
     extend: {
+      text: {
+        xxs: '0.67rem',
+        md: '0.75rem',
+      },
       colors: {
         yt: {
           // Background layers
@@ -24,7 +28,8 @@ module.exports = {
           // Accent (YouTube red + blue links)
           accent: {
             red: '#FF0000', // YouTube brand red
-            'hover-red': '#ff4343',
+            'hover-red': 'rgba(54,11,10,1.000)',
+            // 'hover-red': '#ff4343',
             link: '#3EA6FF', // Links / hover highlights
           },
         },

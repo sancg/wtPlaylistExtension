@@ -4,15 +4,15 @@ import React, { useEffect, useState } from 'react';
 import handleFileUpload from './uploadPlaylist';
 
 import { createRoot } from 'react-dom/client';
-import { sendToBackground } from '../../utils/actions/messages';
-import { ArrowUpOnSquareStackIcon, BuildingLibraryIcon } from '@heroicons/react/20/solid';
+import { BuildingLibraryIcon } from '@heroicons/react/20/solid';
 
 import type { ViewState } from '../../features/playlist/types';
 import type { StoragePlaylist, Video } from '../../types/video';
 import type { SidePanelSession } from '../../types/messages';
-import { WtList } from '../../features/playlist/components/WtList';
-import { WtListSkeletonItem } from '../../features/playlist/components/SkeletonWtList';
-import { PlaybackCount } from '../../features/playlist/components/PlaybackCount';
+
+import { sendToBackground } from '../../utils/actions';
+import { PlaybackCount, SnackSkeleton, WtList } from '../../features/playlist/components';
+import { DocumentArrowUpIcon } from '@heroicons/react/24/outline';
 
 function SidePanel() {
   const [panelView, setPanelView] = useState<ViewState>({
@@ -25,6 +25,7 @@ function SidePanel() {
   const [multiPlaylist, setMultiPlaylist] = useState<StoragePlaylist>({});
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
 
+  // ---------------------- NAVIGATION ------------------------- //
   const handleForwardView = (playlistId: string) => {
     const newState = { view: 'VIDEOS', playlistId, direction: 'forward' };
     sendToBackground({
@@ -43,6 +44,17 @@ function SidePanel() {
     // Reset currentVideo
     setCurrentVideo(null);
   };
+
+  const handleActiveVideo = (video: Video) => {
+    console.info(`[SIDE_PANEL] Selecting video: `, video);
+    setCurrentVideo(video);
+    sendToBackground({
+      type: 'PLAY_VIDEO',
+      payload: { videoId: video.id, index: video.currentIndex as number },
+    });
+  };
+
+  // ----------------------------------------------------------- //
 
   useEffect(() => {
     setIsLoading(true);
@@ -81,11 +93,35 @@ function SidePanel() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const handleActiveVideo = (video: Video) => {
-    console.info(`[SIDE_PANEL] Selecting video: `, video);
-    setCurrentVideo(video);
-    sendToBackground({ type: 'PLAY_VIDEO', payload: { videoId: video.id } });
-  };
+  // Subscriber to localStorage changes
+  useEffect(() => {
+    setIsLoading(true);
+    const listener: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (
+      changes,
+      areaName,
+    ) => {
+      if (areaName !== 'local') return;
+
+      const multi = changes.playlists.newValue as StoragePlaylist;
+      if (changes.playlists?.newValue) {
+        setMultiPlaylist(multi);
+        setPlaylist(multi.heart || ([] as Video[]));
+      }
+
+      if (changes.playlists?.newValue === undefined) {
+        // setMultiPlaylist({});
+      }
+      setIsLoading(false);
+    };
+
+    chrome.storage.onChanged.addListener(listener);
+
+    return () => {
+      chrome.storage.onChanged.removeListener(listener);
+      setIsLoading(false);
+    };
+  }, []);
+
   const renderView = () => {
     return (
       <div
@@ -96,25 +132,29 @@ function SidePanel() {
         }`}
       >
         {/* PLAYLISTS VIEW */}
-        <div className='w-full shrink-0 overflow-y-scroll yt-scrollbar'>
-          {Object.entries(multiPlaylist).map(([plName, values]) => {
-            return (
-              <WtList
-                playList={[values[0]]}
-                imgVariant='stacked'
-                viewState={panelView}
-                title={plName}
-                chip={values.length}
-                onItemClick={() => handleForwardView(plName)}
-              />
-            );
-          })}
+        <div className='w-full shrink-0 overflow-y-auto yt-scrollbar'>
+          {isLoading ? (
+            <SnackSkeleton items={12} />
+          ) : (
+            Object.entries(multiPlaylist).map(([plName, values]) => {
+              return (
+                <WtList
+                  playList={[values[0]]}
+                  imgVariant='stacked'
+                  viewState={panelView}
+                  playlistKey={plName}
+                  chip={values.length}
+                  onItemClick={() => handleForwardView(plName)}
+                />
+              );
+            })
+          )}
         </div>
 
         {/* VIDEOS VIEW */}
-        <div className='w-full shrink-0 overflow-y-scroll yt-scrollbar'>
+        <div className='w-full shrink-0 overflow-y-scroll overflow-x-hidden yt-scrollbar'>
           {isLoading ? (
-            <WtListSkeletonItem items={12} />
+            <SnackSkeleton items={12} />
           ) : (
             panelView.view === 'VIDEOS' && (
               <WtList
@@ -130,6 +170,7 @@ function SidePanel() {
       </div>
     );
   };
+
   return (
     <main className='bg-yt-bg w-full h-lvh p-1 text-yt-text-primary'>
       <div className='relative flex flex-col min-w-3xs h-full bg-yt-bg shadow-lg border rounded-2xl border-yt-br_new  overflow-y-hidden'>
@@ -146,13 +187,7 @@ function SidePanel() {
                 />
               ) : (
                 <>
-                  <button
-                    className='text-sm font-medium p-2 rounded-full hover:cursor-pointer hover:bg-yt-text-muted'
-                    type='button'
-                    onClick={() => {
-                      sendToBackground({ type: 'SIDE_PANEL_OPEN', payload: { open: false } });
-                    }}
-                  >
+                  <button className='relative overflow-hidden text-sm h-full font-medium p-2 rounded-full'>
                     <BuildingLibraryIcon className='w-6' />
                   </button>
                   <h2 className='text-base font-black truncate whitespace-normal line-clamp-1'>
@@ -162,9 +197,10 @@ function SidePanel() {
               )}
             </div>
           </div>
+          {/** BUTTON ACTIONS ON HEADER */}
           {panelView.view === 'PLAYLISTS' ? (
-            <label className='flex min-w-28 px-3 py-2 justify-around place-items-center cursor-pointer font-bold text-sm bg-yt-bg-tertiary rounded-2xl border border-yt-border hover:bg-yt-border'>
-              <ArrowUpOnSquareStackIcon width={20} />
+            <label className='flex gap-1 min-w-24 px-3 py-2 justify-around place-items-center cursor-pointer font-bold text-sm bg-yt-bg-tertiary rounded-full border border-yt-border hover:bg-yt-border'>
+              <DocumentArrowUpIcon width={20} />
               Upload
               <input
                 type='file'
@@ -174,8 +210,9 @@ function SidePanel() {
               />
             </label>
           ) : (
-            <button className='min-w-28 py-2 px-3 rounded-2xl ring ring-yt-border'></button>
+            <button className='py-2 px-3 rounded-2xl ring ring-yt-border'></button>
           )}
+          {/** ----------------------- */}
         </div>
 
         {/* VIEW STATE */}

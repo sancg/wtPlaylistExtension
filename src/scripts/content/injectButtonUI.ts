@@ -283,8 +283,10 @@ import { ThumbList, Video } from '../../types/video';
       video.thumbnailList = thumbs;
 
       const lengthSeconds = videoDetails.lengthSeconds;
-      const SEC = lengthSeconds % 60;
+      let SEC: string | number = lengthSeconds % 60;
       const MIN = (lengthSeconds - SEC) / 60;
+
+      SEC = SEC < 10 ? '0' + SEC : SEC;
       video.timeLength = `${MIN}:${SEC}`;
     } catch (err) {
       console.warn(`[VIDEO META] Something happen on the "wt" request: ${err}`);

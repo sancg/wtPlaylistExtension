@@ -8,6 +8,7 @@ export default defineConfig({
 
   build: {
     outDir: 'dist',
+    modulePreload: false,
 
     rollupOptions: {
       input: {
@@ -32,16 +33,16 @@ export default defineConfig({
           return 'assets/app/ui/[name].js';
         },
 
-        chunkFileNames(chunkInfo) {
+        chunkFileNames(_chunkInfo) {
           // Never create shared chunks for content scripts
-          if (chunkInfo.facadeModuleId?.includes('content/')) {
-            return 'assets/app/scripts/content/[name].js';
-          }
+          // if (chunkInfo.facadeModuleId?.includes('content/')) {
+          //   return 'assets/app/scripts/content/[name].js';
+          // }
 
           // background cannot use shared chunks either
-          if (chunkInfo.facadeModuleId?.includes('background/')) {
-            return 'assets/app/scripts/background/[name].js';
-          }
+          // if (chunkInfo.facadeModuleId?.includes('background/')) {
+          //   return 'assets/app/scripts/background/[name].js';
+          // }
 
           // UI can share chunks
           return 'assets/app/bundler/[name]-[hash].js';
