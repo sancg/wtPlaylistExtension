@@ -32,9 +32,10 @@ export default function WtList({
   activeVideoId,
   onItemClick,
 }: props) {
+  const isVideos = viewState.view === 'VIDEOS';
   const refContent = useRef<HTMLDivElement>(null);
-  const { containerRef: buttonRef, createBorderRipple } = useRipple();
 
+  const { containerRef: buttonRef, createBorderRipple } = useRipple();
   const observe = useVisibleObserver(refContent.current, (_el) => {});
 
   const handleOptionClick = async (playlistName: string) => {
@@ -55,7 +56,7 @@ export default function WtList({
   };
 
   if (isLoading) {
-    return <SnackSkeleton items={1} />;
+    return <SnackSkeleton items={playList.length} />;
   }
 
   return (
@@ -69,21 +70,19 @@ export default function WtList({
             ref={refContent}
             className={`ref-content relative group inline-block w-full ${isPlayingVideo && 'bg-yt-accent-hover-red/80'}`}
           >
-            <div
+            <a
+              href={playlistKey ? '' : `https://www.youtube.com/watch?v=${video.id}`}
               ref={observe}
               className={`flex justify-center items-center py-2 hover:bg-yt-bg-tertiary hover:cursor-pointer hover:opacity-100`}
               onClick={() => {
-                switch (viewState.view) {
-                  case 'VIDEOS':
-                    // Assign clickable function if it is NOT playingVideo
-                    if (!isPlayingVideo) {
-                      onItemClick?.({ ...video, currentIndex: idx + 1 });
-                    }
-                    break;
-                  default: // PLAYLISTS
-                    onItemClick?.(video);
-                    break;
-                }
+                if (isVideos) {
+                  if (!isPlayingVideo) {
+                    onItemClick?.({ ...video, currentIndex: idx + 1 });
+                  }
+                  return; // Active video without function
+                } 
+
+                onItemClick?.(video);
               }}
             >
               {renderIndex(isPlayingVideo)}
@@ -96,6 +95,7 @@ export default function WtList({
                 viewState={viewState}
               />
               <div className='w-10 mx-1 flex items-center justify-center opacity-0 translate-x-1 scale-90 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 transition-all duration-100 ease-out'>
+                {/* IMPROVE: Ripple Buttons Component to built UI library */}
                 <button
                   className='relative overflow-hidden w-full h-10 rounded-full transition-colors duration-150 hover:cursor-pointer hover:bg-white/10 active:bg-white/20'
                   type='button'
@@ -103,7 +103,7 @@ export default function WtList({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (viewState.view === 'PLAYLISTS') {
+                    if (!isVideos) {
                       handleOptionClick(playlistKey!);
                     }
                   }}
@@ -115,7 +115,7 @@ export default function WtList({
                   <EllipsisVerticalIcon className='w-6 h-6 m-auto' />
                 </button>
               </div>
-            </div>
+            </a>
           </div>
         );
       })}

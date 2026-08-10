@@ -25,6 +25,7 @@ function SidePanel() {
   const [multiPlaylist, setMultiPlaylist] = useState<StoragePlaylist>({});
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
 
+  // ---------------------- NAVIGATION ------------------------- //
   const handleForwardView = (playlistId: string) => {
     const newState = { view: 'VIDEOS', playlistId, direction: 'forward' };
     sendToBackground({
@@ -43,6 +44,17 @@ function SidePanel() {
     // Reset currentVideo
     setCurrentVideo(null);
   };
+
+  const handleActiveVideo = (video: Video) => {
+    console.info(`[SIDE_PANEL] Selecting video: `, video);
+    setCurrentVideo(video);
+    sendToBackground({
+      type: 'PLAY_VIDEO',
+      payload: { videoId: video.id, index: video.currentIndex as number },
+    });
+  };
+
+  // ----------------------------------------------------------- //
 
   useEffect(() => {
     setIsLoading(true);
@@ -81,37 +93,34 @@ function SidePanel() {
       .finally(() => setIsLoading(false));
   }, []);
 
+  // Subscriber to localStorage changes
   useEffect(() => {
+    setIsLoading(true);
     const listener: Parameters<typeof chrome.storage.onChanged.addListener>[0] = (
       changes,
       areaName,
     ) => {
       if (areaName !== 'local') return;
 
+      const multi = changes.playlists.newValue as StoragePlaylist;
       if (changes.playlists?.newValue) {
-        setMultiPlaylist(changes.playlists.newValue as StoragePlaylist);
+        setMultiPlaylist(multi);
+        setPlaylist(multi.heart || ([] as Video[]));
       }
 
       if (changes.playlists?.newValue === undefined) {
-        setMultiPlaylist({});
+        // setMultiPlaylist({});
       }
+      setIsLoading(false);
     };
 
     chrome.storage.onChanged.addListener(listener);
 
     return () => {
       chrome.storage.onChanged.removeListener(listener);
+      setIsLoading(false);
     };
   }, []);
-
-  const handleActiveVideo = (video: Video) => {
-    console.info(`[SIDE_PANEL] Selecting video: `, video);
-    setCurrentVideo(video);
-    sendToBackground({
-      type: 'PLAY_VIDEO',
-      payload: { videoId: video.id, index: video.currentIndex as number },
-    });
-  };
 
   const renderView = () => {
     return (
